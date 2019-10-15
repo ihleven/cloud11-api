@@ -38,7 +38,7 @@ type Repository struct {
 }
 
 // Close ...
-func (r *Repository) Close() {
+func (r Repository) Close() {
 	fmt.Println("closing repository")
 	r.DB.Close()
 }

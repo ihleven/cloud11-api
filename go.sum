@@ -1,3 +1,5 @@
+github.com/benbjohnson/wtf v0.0.0-20161003201939-eeab3970cd77 h1:2ShOJ5OsilGfd01uTUANLMfFpOVk8AsjO+Eml9v0AhM=
+github.com/benbjohnson/wtf v0.0.0-20161003201939-eeab3970cd77/go.mod h1:Lhoe1eY1t4Dj0Q36gxYJCGbKJdLvyOVFBeilOgVXe5c=
 github.com/canthefason/go-watcher v0.2.4 h1:eHGTXM+fJW/dA+/3MjidG0sLhKdSJ8M204zrOLS0dKY=
 github.com/canthefason/go-watcher v0.2.4/go.mod h1:/f4PpHcGDcD0urTseLQi7/mH+koB9SYd54hf0Z6bens=
 github.com/fatih/color v1.7.0 h1:DkWD4oS2D8LGGgTQ6IvwJJXSL5Vp2ffcQg58nFV38Ys=

@@ -64,15 +64,6 @@ type Arbeitsjahr struct {
 	userID                sql.NullInt64
 }
 
-type Zeitspanne struct {
-	Nr                                int
-	Typ                               string
-	Von, Bis                          *time.Time
-	Dauer                             *float64
-	Titel, Story, Beschreibung, Grund *string
-	Arbeitszeit                       bool
-}
-
 type Arbeitstag struct {
 	ID int `db:"id" json:"id"`
 	//Account      int //domain.Account
@@ -84,12 +75,23 @@ type Arbeitstag struct {
 	Soll         float64    `json:"soll,omitempty"`
 	Start        *time.Time `db:"beginn" json:"beginn,omitempty"`
 	Ende         *time.Time `db:"ende" json:"ende,omitempty"`
-	Brutto       float64    `json:"brutto,omitempty"`
-	Pausen       float64    `json:"pausen,omitempty"`
-	Extra        float64    `json:"extra,omitempty"`
-	Netto        float64    `json:"netto,omitempty"`
-	Differenz    float64    `json:"diff,omitempty"`
+	Brutto       float64    `json:"brutto"`
+	Pausen       float64    `json:"pausen"`
+	Extra        float64    `json:"extra"`
+	Netto        float64    `json:"netto"`
+	Differenz    float64    `json:"diff"`
+	Kommentar    string     `json:"kommentar"`
 	// Saldo        *float64
-	// Zeitspannen  []Zeitspanne
 	Kalendertag ` json:"tag,omitempty"`
+	Zeitspannen []Zeitspanne ` json:"zeitspannen,omitempty"`
+}
+
+type Zeitspanne struct {
+	Nr    int        `json:"nr"`
+	Typ   string     `json:"typ"`
+	Von   *time.Time `json:"start"`
+	Bis   *time.Time `json:"ende"`
+	Dauer *float64   `json:"dauer"`
+	// Titel, Story, Beschreibung, Grund *string
+	Arbeitszeit bool `json:"-"`
 }

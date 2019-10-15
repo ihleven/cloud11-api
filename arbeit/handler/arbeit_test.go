@@ -1,4 +1,4 @@
-package arbeit
+package handler
 
 import (
 	"testing"

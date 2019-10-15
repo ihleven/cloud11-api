@@ -3,6 +3,7 @@ module github.com/ihleven/cloud11-api
 go 1.13
 
 require (
+	github.com/benbjohnson/wtf v0.0.0-20161003201939-eeab3970cd77
 	github.com/canthefason/go-watcher v0.2.4 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/jmoiron/sqlx v1.2.0

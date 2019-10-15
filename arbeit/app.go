@@ -8,64 +8,71 @@ import (
 
 func GetArbeitsjahr(year int, accountID int) (*Arbeitsjahr, error) {
 
-	a, err := Repo.RetrieveArbeitsjahr(year, accountID)
-	fmt.Println("ArbeitsJahr:", a)
-
-	return a, err
+	return Repo.RetrieveArbeitsjahr(year, accountID)
 }
 
-func GetArbeitsMonat(year, month, accountID int) ([]Arbeitstag, error) {
-	fmt.Println("arbeitsmonat", year, month)
-	aa, err := Repo.ListArbeitstage(year, month, 0, accountID)
+func GetArbeitstag(year, month, day int, accountID int) (*Arbeitstag, error) {
 
-	return aa, err
-}
-
-func UpdateArbeitstag(year, month, day int, accountID int, arbeitstag *Arbeitstag) (*Arbeitstag, error) {
-
-	a, err := Repo.ReadArbeitstag(year + month + day + accountID)
+	at, err := Repo.ReadArbeitstag(((year*100+month)*100+day)*1000 + accountID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not retrieve Arbeitstag %s%s%s", year, month, day)
+		return new(Arbeitstag), nil
 	}
+	return at, nil
+}
+
+func UpdateArbeitstag(year, month, day int, accountID int, arbeitstag *Arbeitstag) error {
+
+	fmt.Println("usecase update arbeitstag", year, month, day, accountID, *arbeitstag)
+
+	id := ((year*100+month)*100+day)*1000 + accountID
+
+	arbeitstag.Pausen, _ = UpdateZeitspannen(id, arbeitstag.Zeitspannen)
+	arbeitstag.Extra = 0
+
+	// arbeitstagDB, err := Repo.ReadArbeitstag(id)
+	// if err != nil {
+	// 	fmt.Println("read at error:", err)
+	// 	return errors.Wrapf(err, "Could not retrieve Arbeitstag %s%s%s", year, month, day)
+	// }
 	if arbeitstag.Start != nil && arbeitstag.Ende != nil {
 		arbeitstag.Brutto = arbeitstag.Ende.Sub(*arbeitstag.Start).Hours()
 		arbeitstag.Netto = arbeitstag.Brutto - arbeitstag.Pausen + arbeitstag.Extra
 		arbeitstag.Differenz = arbeitstag.Soll - arbeitstag.Netto
 	}
-	//err = UpdateZeitspannen(a.ID, arbeitstag.Zeitspannen)
 
-	Repo.UpdateArbeitstag(a.ID, arbeitstag)
-
-	return arbeitstag, err
+	err := Repo.UpdateArbeitstag(id, arbeitstag)
+	if err != nil {
+		return errors.Wrapf(err, "Could not update Arbeitstag %d", id)
+	}
+	fmt.Println("sucess update arbeitstag", id)
+	return nil
 }
 
-func UpdateZeitspannen(arbeitstagId int, zeitspannen []Zeitspanne) error {
-	fmt.Println("UpdateZeitspanne")
-	// list of current zeitspanne ids
-	//zeitspanne_ids := make([]int, 0)
-	///for _, zeitspanne := range zeitspannen {
-	//	zeitspanne_ids = append(zeitspanne_ids, zeitspanne.Nr)
-	//}
+func UpdateZeitspannen(arbeitstagId int, zeitspannen []Zeitspanne) (float64, error) {
+
+	pausen := 0.0
+
+	// Zeitspannen in der DB loeschen, deren Nr. es nicht mehr gibt
 	dbZeitspannen, _ := Repo.ListZeitspannen(arbeitstagId)
-	for _, zeitspanne := range dbZeitspannen {
-		if !IsContained(zeitspannen, zeitspanne) {
-			Repo.DeleteZeitspanne(&zeitspanne)
+	for _, dbZeitspanne := range dbZeitspannen {
+		if !IsContained(zeitspannen, dbZeitspanne) {
+			Repo.DeleteZeitspanne(arbeitstagId, dbZeitspanne.Nr)
 		}
 	}
+	// Insert oder Update Zeitspannen
 	for _, zeitspanne := range zeitspannen {
+		dauer := zeitspanne.Bis.Sub(*zeitspanne.Von).Hours()
+
+		zeitspanne.Dauer = &dauer
+		pausen += dauer
+		fmt.Println("Dauer: ", dauer, zeitspanne)
 		err := Repo.UpsertZeitspanne(arbeitstagId, &zeitspanne)
 		if err != nil {
-			fmt.Println("asdfasdfasdf", err)
+			fmt.Println("error upsert:", err)
+			return 0.0, err
 		}
 	}
-
-	//if not zeitspanne.get('nr', False):
-	//    max_zeitspanne_num += 1
-	//    zeitspanne['nr'] = max_zeitspanne_num
-
-	//zeitspanne, created = Zeitspanne.objects.update_or_create(arbeitstag=instance, nr=zeitspanne['nr'], defaults=zeitspanne)
-	//zeitspanne.eval()
-	return nil
+	return pausen, nil
 }
 
 func IsContained(haystack []Zeitspanne, needle Zeitspanne) bool {
