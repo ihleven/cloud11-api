@@ -2,7 +2,7 @@ package arbeit
 
 type Repository interface {
 	RetrieveArbeitsjahr(year int, accountID int) (*Arbeitsjahr, error)
-
+	RetrieveArbeitsmonat(year, month, accountID int) (*Arbeitsmonat, error)
 	ListArbeitstage(year, month, week int, accountID int) ([]Arbeitstag, error)
 	ReadArbeitstag(int) (*Arbeitstag, error)
 	UpdateArbeitstag(int, *Arbeitstag) error

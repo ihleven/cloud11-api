@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"time"
-
 	"github.com/ihleven/cloud11-api/arbeit"
 
 	"github.com/pkg/errors"
@@ -32,23 +30,4 @@ func (r Repository) RetrieveArbeitstage(year, month, week int, accountID int) (a
 	}
 
 	return
-}
-
-type Arbeitstag2 struct {
-	ID int
-	//Account     domain.Account
-	//Job         Job
-	//Tag         Kalendertag
-	Typ       *string // Arbeitstag, Wochenende, Feiertag
-	Status    *string // Büro => 8, Dienstreise=>8, Krankheit=>0, Urlaub=>0, Zeitausgleich=>8
-	Soll      *float64
-	Start     *time.Time
-	Ende      *time.Time
-	Brutto    *float64
-	Pausen    *float64
-	Extra     *float64
-	Netto     *float64 // Brutto + Extra - Pausen
-	Differenz *float64 // Netto - Soll
-	Saldo     *float64 // ergibt sich aus Saldo Vortag + Differenz
-	//Zeitspannen []Zeitspanne
 }

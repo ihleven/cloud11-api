@@ -11,11 +11,19 @@ func GetArbeitsjahr(year int, accountID int) (*Arbeitsjahr, error) {
 	return Repo.RetrieveArbeitsjahr(year, accountID)
 }
 
+func GetArbeitsmonat(year int, month int, accountID int) (*Arbeitsmonat, error) {
+
+	//m, _ := Repo.ListArbeitstage(year, month, 0, accountID)
+	//return &Arbeitsmonat{m}, nil
+	return Repo.RetrieveArbeitsmonat(year, month, 1)
+}
+
 func GetArbeitstag(year, month, day int, accountID int) (*Arbeitstag, error) {
 
 	at, err := Repo.ReadArbeitstag(((year*100+month)*100+day)*1000 + accountID)
 	if err != nil {
-		return new(Arbeitstag), nil
+		//return &Arbeitstag{}, nil
+		return nil, errors.Wrapf(err, "Could not read Arbeitstag: %d/%d/%d, %d", year, month, day, accountID)
 	}
 	return at, nil
 }
@@ -61,9 +69,9 @@ func UpdateZeitspannen(arbeitstagId int, zeitspannen []Zeitspanne) (float64, err
 	}
 	// Insert oder Update Zeitspannen
 	for _, zeitspanne := range zeitspannen {
-		dauer := zeitspanne.Bis.Sub(*zeitspanne.Von).Hours()
+		dauer := zeitspanne.Ende.Sub(*zeitspanne.Start).Hours()
 
-		zeitspanne.Dauer = &dauer
+		zeitspanne.Dauer = dauer
 		pausen += dauer
 		fmt.Println("Dauer: ", dauer, zeitspanne)
 		err := Repo.UpsertZeitspanne(arbeitstagId, &zeitspanne)
