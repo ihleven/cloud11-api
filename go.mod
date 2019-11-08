@@ -6,6 +6,7 @@ require (
 	github.com/benbjohnson/wtf v0.0.0-20161003201939-eeab3970cd77
 	github.com/canthefason/go-watcher v0.2.4 // indirect
 	github.com/fatih/color v1.7.0 // indirect
+	github.com/h2non/filetype v1.0.10
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.2.0

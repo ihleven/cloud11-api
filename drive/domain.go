@@ -1,6 +1,7 @@
 package drive
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -13,7 +14,13 @@ import (
 type WebDrive interface { // WebDrive
 	GetHandle(url string, prefix string) (Handle, error)
 	GetFile(url string, account *auth.Account) (*File, error)
+	GetFiles(*File, *auth.Account) ([]File, error)
 	GetFolder(file *File, account *auth.Account) (*Folder, error)
+	GenerateBreadcrumbs(p string) []Breadcrumb
+	GenerateParents(p string) []Breadcrumb
+
+	CreateFile(folder *File, name string) (Handle, error)
+	Mkdir(string) (Handle, error)
 }
 
 type Handle interface {
@@ -25,6 +32,8 @@ type Handle interface {
 	//Sys() interface{}   // underlying data source (can return nil)
 	OpenFile(flag int, perm os.FileMode) (*os.File, error)
 	ReadDir(mode os.FileMode) ([]Handle, error)
+	io.Reader
+	io.Writer
 }
 
 //FileResponder builds the entire HTTP response from the domain's output which is given to it by the action.
@@ -51,7 +60,14 @@ type File struct {
 	//Created     *time.Time   `json:"created"`
 	Modified time.Time `json:"modified"`
 	//Accessed    *time.Time   `json:"accessed"`
-	//MIME        types.MIME   `json:"mime"`
+}
+
+type Type struct {
+	Filetype  string `json:"filetype"`
+	Mediatype string `json:"mediatype"`
+	Subtype   string `json:"subtype"`
+	MIME      string `json:"mime"`
+	Charset   string `json:"charset"`
 }
 
 type User struct {
@@ -66,15 +82,10 @@ type Group struct {
 	Gid  string `json:"gid"`  // group ID
 	Name string `json:"name"` // group name
 }
-type Mimetype struct { // MIME
-	Type    string `json:"type"`
-	Subtype string `json:"subtype"`
-	Charset string `json:"charset"`
-}
 
 type Authorization struct {
-	//Account *domain.Account `json:"-"`
-	//Notation          string
+	// Account *domain.Account `json:"-"`
+	// Notation          string
 	IsOwner bool
 	InGroup bool
 	R       bool
@@ -82,17 +93,14 @@ type Authorization struct {
 	X       bool
 }
 
-type Type struct {
-	Filetype  string `json:"filetype"`
-	Mediatype string `json:"mediatype"`
-	Subtype   string `json:"subtype"`
-	MIME      string `json:"mime"`
-	Charset   string `json:"charset"`
-}
-
 type Folder struct {
 	*File
 	Entries []File `json:"entries"`
+}
+
+type Breadcrumb struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 // Action takes HTTP requests (URLs and their methods)

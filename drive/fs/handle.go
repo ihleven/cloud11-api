@@ -57,7 +57,40 @@ func (h handle) Mode() os.FileMode {
 }
 
 func (h handle) OpenFile(flag int, perm os.FileMode) (*os.File, error) {
-	return os.Open(h.location)
+	return os.OpenFile(h.location, flag, perm)
+}
+
+func (fh handle) Read(b []byte) (n int, err error) {
+
+	fd, err := fh.OpenFile(0, 0)
+	if err != nil {
+		return 0, err
+	}
+	defer fd.Close()
+	fd.Seek(0, 0)
+
+	bytes, err := fd.Read(b)
+	if err != nil {
+		return bytes, err
+	}
+	if bytes != int(fh.Size()) {
+		return bytes, errors.Errorf("read only %d of %d bytes", bytes, fh.Size())
+	}
+	return bytes, nil
+}
+
+func (fh handle) Write(b []byte) (int, error) {
+	fd, err := fh.OpenFile(os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return 0, err
+	}
+	defer fd.Close()
+
+	n, err := fd.Write(b)
+	if err != nil {
+		return n, errors.Wrapf(err, "Could not write to handle %v: %v", fh.Name(), string(b))
+	}
+	return n, nil
 }
 
 func (h handle) ReadDir(mode os.FileMode) ([]drive.Handle, error) {

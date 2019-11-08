@@ -2,7 +2,10 @@ package fs
 
 import (
 	"mime"
+	"path"
+	"strings"
 
+	"github.com/h2non/filetype/types"
 	"github.com/ihleven/cloud11-api/drive"
 )
 
@@ -21,7 +24,7 @@ var dir = drive.Type{
 	Filetype:  "D",
 	Mediatype: "dir",
 	Subtype:   "",
-	MIME:      "dir",
+	MIME:      "",
 	Charset:   "",
 }
 
@@ -39,12 +42,27 @@ func (fh handle) GuessMIME() drive.Type {
 		return dir
 	}
 
-	// ext := path.Ext(fh.Name())
+	ext := path.Ext(fh.Name())
 
-	// if mimestr := mime.TypeByExtension(ext); mimestr != "" {
-	// 	m = types.NewMIME(mimestr)
+	if mimestr := mime.TypeByExtension(ext); mimestr != "" {
 
-	// }
+		mime := types.NewMIME(mimestr)
+		splitmimestr := strings.Split(mime.Subtype, "; charset=")
+		var charset string
+		if len(splitmimestr) > 1 {
+			charset = splitmimestr[1]
+		}
+		//fmt.Println(mime, splitmimestr[0])
+		return drive.Type{
+			Filetype:  "F",
+			Mediatype: mime.Type,
+			Subtype:   splitmimestr[0],
+			MIME:      mime.Type + "/" + splitmimestr[0],
+			Charset:   charset,
+		}
+		//
+
+	}
 
 	// if m.Value == "" {
 	// 	// m, _ = f.h2nonMatchMIME261()

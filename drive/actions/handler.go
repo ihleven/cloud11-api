@@ -2,6 +2,7 @@ package actions
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,10 +21,10 @@ func enableCors(w http.ResponseWriter) {
 func Dispatch(wd drive.WebDrive) func(w http.ResponseWriter, r *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		fmt.Println("Dispatch", r.URL.Path)
 		enableCors(w)
 
-		cleanedPath := filepath.Clean(strings.Replace(r.URL.Path, "|jpg", ".jpg", 1))
+		cleanedPath := filepath.Clean(strings.Replace(r.URL.Path, "|", ".", 1))
 
 		file, err := wd.GetFile(cleanedPath, auth.CurrentUser)
 		if err != nil {
@@ -39,27 +40,21 @@ func Dispatch(wd drive.WebDrive) func(w http.ResponseWriter, r *http.Request) {
 		//
 		// da := DriveAction{File: file, wd: wd, Account: auth.CurrentUser}
 		var action Actioneer
+
 		switch {
 		case file.Type.Filetype == "F":
-			// action = FileAction{da}
-			SerializeJSON(w, r, file)
+			action = &FileAction{File: file, wd: wd}
 
 		case file.Type.Filetype == "D":
-			//
-			folder, err := wd.GetFolder(file, auth.CurrentUser)
-			if err != nil {
-				http.Error(w, err.Error(), 500)
-			}
-			action = DirActionResponder{Folder: folder, wd: wd}
-			err = action.Handle(w, r)
-			SerializeJSON(w, r, action)
+			action = &DirActionResponder{File: file, wd: wd}
 		}
-		// err = action.Handle(w, r)
-		// if err != nil {
-		// 	SerializeJSON(w, r, err)
-		// } else {
-		// 	SerializeJSON(w, r, action)
-		// }
+		err = action.Handle(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		SerializeJSON(w, r, action)
+
 	}
 }
 
