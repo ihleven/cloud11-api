@@ -2,11 +2,11 @@ package fs
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"syscall"
-	"time"
 
 	"github.com/ihleven/cloud11-api/auth"
 	"github.com/ihleven/cloud11-api/drive"
@@ -14,24 +14,26 @@ import (
 )
 
 // FSHandle erfüllt Mimer, Locator,
-type FSHandle struct {
-	drive   *FSWebDrive
-	Path    string      // Pfad relativ zur Storage-Wurzel
-	Name    string      // base name of the file
-	Size    int64       // length in bytes for regular files; system-dependent for others
-	Mode    os.FileMode // file mode bits
-	ModTime time.Time   // modification time
-	IsDir   bool        // abbreviation for Mode().IsDir()
-	//Sys() interface{}   // underlying data source (can return nil)
-}
+// type FSHandle struct {
+// 	drive   *FSWebDrive
+// 	Path    string      // Pfad relativ zur Storage-Wurzel
+// 	Name    string      // base name of the file
+// 	Size    int64       // length in bytes for regular files; system-dependent for others
+// 	Mode    os.FileMode // file mode bits
+// 	ModTime time.Time   // modification time
+// 	IsDir   bool        // abbreviation for Mode().IsDir()
+// 	//Sys() interface{}   // underlying data source (can return nil)
+// }
 
-func (h *FSHandle) Open() (*os.File, error) {
+// func (h *FSHandle) Open() (*os.File, error) {
 
-	location := filepath.Join(h.drive.Root, h.Path)
-	return os.OpenFile(location, os.O_RDONLY, 0)
-	// os.OpenFile(name string, flag int, perm FileMode) (*File, error) {
-}
+// 	location := filepath.Join(h.drive.Root, h.Path)
+// 	return os.OpenFile(location, os.O_RDONLY, 0)
+// 	// os.OpenFile(name string, flag int, perm FileMode) (*File, error) {
+// }
 
+// NewHandle creates a handle with given parameters FileInfo, location and mode.
+// Only a non-zero mode overwrites the FileInfo.mode()
 func NewHandle(fileInfo os.FileInfo, location string, mode os.FileMode) *handle {
 
 	handle := &handle{
@@ -50,47 +52,61 @@ type handle struct {
 	os.FileInfo
 	location string
 	mode     os.FileMode
+	//name string
 }
 
+// Mode overwrites FileInfo.Mode() returning handles own mode
 func (h handle) Mode() os.FileMode {
 	return h.mode
 }
 
+// OpenFile wraps os.OpenFile
 func (h handle) OpenFile(flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(h.location, flag, perm)
 }
 
-func (fh handle) Read(b []byte) (n int, err error) {
+// Read implements io.Reader interface
+func (h handle) Read(b []byte) (n int, err error) {
 
-	fd, err := fh.OpenFile(0, 0)
+	fd, err := h.OpenFile(os.O_RDONLY, 0) // os.Open
 	if err != nil {
 		return 0, err
 	}
 	defer fd.Close()
-	fd.Seek(0, 0)
+	fd.Seek(0, io.SeekStart)
 
 	bytes, err := fd.Read(b)
 	if err != nil {
 		return bytes, err
 	}
-	if bytes != int(fh.Size()) {
-		return bytes, errors.Errorf("read only %d of %d bytes", bytes, fh.Size())
+	if bytes != int(h.Size()) {
+		h.FileInfo, _ = fd.Stat()
+		//return bytes, errors.Errorf("read only %d of %d bytes", bytes, fh.Size())
 	}
+	fmt.Println("readed:", bytes)
 	return bytes, nil
 }
+func (h handle) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
 
-func (fh handle) Write(b []byte) (int, error) {
-	fd, err := fh.OpenFile(os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0)
+// Write implements io.Writer interface for handle
+func (h handle) Write(b []byte) (int, error) {
+	fd, err := h.OpenFile(os.O_WRONLY|os.O_TRUNC, 0)
 	if err != nil {
 		return 0, err
 	}
 	defer fd.Close()
 
-	n, err := fd.Write(b)
+	bytes, err := fd.Write(b)
 	if err != nil {
-		return n, errors.Wrapf(err, "Could not write to handle %v: %v", fh.Name(), string(b))
+		return bytes, errors.Wrapf(err, "Could not write to handle %v", h.location)
 	}
-	return n, nil
+	h.FileInfo, err = fd.Stat()
+	if err != nil {
+		return bytes, errors.Wrapf(err, "Could not update FileInfo of handle %v", h.location)
+	}
+	return bytes, nil
 }
 
 func (h handle) ReadDir(mode os.FileMode) ([]drive.Handle, error) {
@@ -115,9 +131,9 @@ func (h handle) ReadDir(mode os.FileMode) ([]drive.Handle, error) {
 	return entries, nil
 }
 
-func (fh handle) getUidGid() (uid uint32, gid uint32) {
+func (h handle) userAndGroupIDs() (uid uint32, gid uint32) {
 
-	if stat, ok := fh.Sys().(*syscall.Stat_t); ok {
+	if stat, ok := h.Sys().(*syscall.Stat_t); ok {
 		uid, gid = stat.Uid, stat.Gid
 	}
 	return
@@ -125,32 +141,53 @@ func (fh handle) getUidGid() (uid uint32, gid uint32) {
 
 //PERMISSIONS
 
-func (fh handle) HasReadPermission(account *auth.Account) bool {
+func (h handle) HasReadPermissionFalsch(account *auth.Account) bool {
 
-	if fh.mode&OS_OTH_R != 0 {
-		fmt.Println("has other read:", fh.mode, fh.mode&4)
+	if h.mode&OS_OTH_R != 0 {
 		return true
 	}
 
-	stat, ok := fh.Sys().(*syscall.Stat_t)
+	stat, ok := h.Sys().(*syscall.Stat_t)
 	if ok {
-		fmt.Println("checking group:", account, fh.mode&OS_GROUP_R)
-		if fh.mode&OS_GROUP_R != 0 {
+		if h.mode&OS_GROUP_R != 0 {
 			return account != nil && stat.Gid == gid[account.Username]
 		}
-		if fh.mode&OS_USER_R != 0 {
+		if h.mode&OS_USER_R != 0 {
 			return account != nil && stat.Uid == uid[account.Username]
 		}
 	}
 	return false
 }
+func (h handle) HasReadPermission(account *auth.Account) bool {
 
-func (fh handle) GetPermissions(account *auth.Account) drive.Authorization { // => handle
+	if account == &auth.Anonymous {
+		fmt.Println("is anon", h.mode&OS_OTH_R != 0)
+
+		return h.mode&OS_OTH_R != 0
+	}
+
+	stat, ok := h.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false
+	}
+	if stat.Uid == uid[account.Username] {
+		fmt.Println("is user")
+		return h.mode&OS_USER_R != 0
+	} else if stat.Gid == gid[account.Username] {
+		fmt.Println("is group")
+		return h.mode&OS_GROUP_R != 0
+	} else {
+		fmt.Println("is other")
+		return h.mode&OS_OTH_R != 0
+	}
+}
+
+func (h handle) GetPermissions(account *auth.Account) drive.Authorization { // => handle
 
 	perm := drive.Authorization{}
 
 	if account != nil {
-		if stat, ok := fh.Sys().(*syscall.Stat_t); ok {
+		if stat, ok := h.Sys().(*syscall.Stat_t); ok {
 			perm.InGroup = stat.Gid == gid[account.Username]
 			perm.IsOwner = stat.Uid == uid[account.Username]
 		}
@@ -164,9 +201,9 @@ func (fh handle) GetPermissions(account *auth.Account) drive.Authorization { // 
 		read, write, x = read|OS_USER_R, write|OS_USER_W, x|OS_USER_X
 	}
 
-	perm.R = fh.mode&os.FileMode(read) != 0
-	perm.W = fh.mode&os.FileMode(write) != 0
-	perm.X = fh.mode&os.FileMode(x) != 0
+	perm.R = h.mode&os.FileMode(read) != 0
+	perm.W = h.mode&os.FileMode(write) != 0
+	perm.X = h.mode&os.FileMode(x) != 0
 	return perm
 }
 

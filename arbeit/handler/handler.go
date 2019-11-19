@@ -56,8 +56,9 @@ type params struct {
 }
 
 func parseURL(urlpath string) *params {
+	fmt.Println(urlpath)
 	var params params
-	var regex = regexp.MustCompile(`arbeit\/(\d{4})\/?(kw|KW|Kw|w|W)?(\d{1,2})?\/?(\d{1,2})?`)
+	var regex = regexp.MustCompile(`\/(\d{4})\/?(kw|KW|Kw|w|W)?(\d{1,2})?\/?(\d{1,2})?`)
 	matches := regex.FindStringSubmatch(urlpath)
 	if matches != nil {
 		if year, err := strconv.Atoi(matches[1]); err == nil {
