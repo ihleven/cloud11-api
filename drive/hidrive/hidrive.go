@@ -80,7 +80,9 @@ type DirResponse struct {
 }
 
 func hidriveGetDir(path string, bearer string) (*DirResponse, error) {
-
+	if path == "" {
+		path = "/"
+	}
 	members := "members.id,members.mime_type,members.mtime,members.name,members.readable,members.writable,members.type,members.nmembers,members.path,members.size"
 	queryParams := url.Values{
 		"path":    {path},
@@ -90,25 +92,29 @@ func hidriveGetDir(path string, bearer string) (*DirResponse, error) {
 	req, _ := http.NewRequest("GET", "https://api.hidrive.strato.com/2.1/dir", nil)
 	req.URL.RawQuery = queryParams.Encode()
 	req.Header.Set("Authorization", "Bearer "+bearer)
+
 	client := &http.Client{}
-	res, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != 200 {
-		return nil, NewHiDriveError(res.Body, res.StatusCode, res.Status)
-	}
-	body, err := ioutil.ReadAll(res.Body)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+
+	if resp.StatusCode != 200 {
+		return nil, NewHiDriveError2(resp.StatusCode, resp.Status, body)
+	}
+
 	//fmt.Println("hidriveGetDirResponse:", string(body), res.Status, res.StatusCode, "adf")
 
 	var response DirResponse
-	if err = json.NewDecoder(bytes.NewReader(body)).Decode(&response); err != nil {
+	if err = json.Unmarshal(body, &response); err != nil {
 		return nil, err
 	}
-	fmt.Printf("dir response: %v\n", response)
 
 	return &response, nil
 }

@@ -1,7 +1,6 @@
 package hidrive
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -46,6 +45,7 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
 		return nil, NewHiDriveError(res.Body, res.StatusCode, res.Status)
@@ -56,14 +56,16 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 	}
 
 	var handle hiHandle
-	if err = json.NewDecoder(bytes.NewReader(body)).Decode(&handle); err != nil {
+
+	if err = json.Unmarshal(body, &handle); err != nil {
+
 		return nil, err
 	}
-
 	return &handle, nil
 }
 
 func (hd *hiDrive) Open(name string) (drive.Handle, error) {
+
 	return hd.GetMeta(name)
 }
 
@@ -110,7 +112,7 @@ func (h *hiDrive) Mkdir(string) (drive.Handle, error) {
 
 func (h *hiDrive) ListFiles(folder *drive.File, account *auth.Account) ([]drive.File, error) {
 
-	//folder.
+	fmt.Printf("ListDir: %v - %v - %v\n", strings.TrimPrefix(folder.URL, h.URL), folder.URL, h.URL)
 	dir, err := hidriveGetDir(strings.TrimPrefix(folder.URL, h.URL), h.Token.GetAccessToken())
 	if err != nil {
 		fmt.Println("errdir", err)

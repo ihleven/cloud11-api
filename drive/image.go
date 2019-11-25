@@ -25,7 +25,7 @@ func (a *DriveAction) ImageAction(r *http.Request) error {
 			return errors.Wrap(err, "Error in ImagePostAction")
 		}
 	}
-	
+
 	if !a.File.Authorization.R {
 		return errors.Errorf("Missing read permission for %v (User %s)", a.File.Name, a.Account.Username)
 	}
@@ -61,11 +61,12 @@ func (a *DriveAction) ImagePostAction(r *http.Request) error {
 	image.Title = r.FormValue("title")
 	image.Caption = r.FormValue("caption")
 	image.Cutline = r.FormValue("cutline")
-
+	
 	if err := a.WriteImageMeta(); err != nil {
 
 		return errors.Wrap(err, "WriteImageMeta")
 	}
+
 	// http.Redirect(w, r, v.File.Path, http.StatusFound)
 	return nil
 }
@@ -76,10 +77,11 @@ func metaFilename(path string) string {
 }
 
 func (a *DriveAction) WriteImageMeta() error {
+	
 
 	metaHandle, err := a.Drive.Open(metaFilename(a.path))
-
-	fmt.Println("metaHandle:", err.Error() )
+	
+	
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "Not Found") {
 		metaHandle, err = a.Drive.Create(metaFilename(a.path), DrivePath)

@@ -12,5 +12,6 @@
 *.out
 
 cloud11
+cloud11-api
 hidrive.config
 token
