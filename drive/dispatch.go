@@ -47,7 +47,7 @@ func DispatchRaw(wd Driver) http.HandlerFunc {
 	dispatchRaw = func(w http.ResponseWriter, r *http.Request) {
 
 		cleanedPath := filepath.Clean(strings.Replace(r.URL.Path, "|", ".", 1))
-
+		fmt.Println("serve raw:", cleanedPath)
 		h, err := wd.Open(cleanedPath) //, os.O_RDONLY)
 		if checkHTTPError(w, err) {
 			return
@@ -71,7 +71,7 @@ func DispatchRaw(wd Driver) http.HandlerFunc {
 		}
 		defer fd.Close()
 
-		//http.ServeContent(w, r, h.Name(), h.ModTime(), fd)
+		http.ServeContent(w, r, path.Base(cleanedPath), h.ModTime(), fd)
 	}
 	return dispatchRaw
 }
@@ -88,19 +88,28 @@ func DispatchHandler(wd Driver) http.HandlerFunc {
 			Drive:   wd,
 			Account: auth.CurrentUser,
 		}
+
 		file, err := wd.OpenFile(action.path, auth.CurrentUser)
 		if checkHTTPError(w, err) {
 			return
 		}
+
 		action.File = file
-		fmt.Println("action.File.Type", file.Type.Filetype)
+
 		if file.Type.Filetype == "D" {
 			//action.FolderAction(r)
 			action.Entries, err = wd.ListFiles(action.File, auth.CurrentUser)
 		}
+		if file.Type.Mediatype == "text" {
+
+			err = action.FileAction(r)
+		}
 		if file.Type.Mediatype == "image" {
-			//action.FolderAction(r)
-			action.Entries, err = wd.ListFiles(action.File, auth.CurrentUser)
+
+			err = action.ImageAction(r)
+		}
+		if checkHTTPError(w, err) {
+			return
 		}
 		action.Breadcrumbs = generateParents(action.File.URL, "root")
 
@@ -142,7 +151,8 @@ func Dispatch(wd Driver) func(*http.Request) (*DriveAction, error) {
 			action.Content = string(bytecontent)
 		}
 		if action.File.Type.Mediatype == "image" {
-			//err = action.ImageAction(r)
+			fmt.Println("image handler", r.Method)
+			err = action.ImageAction(r)
 		}
 		if err != nil {
 			return nil, err

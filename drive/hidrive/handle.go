@@ -4,13 +4,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ihleven/cloud11-api/auth"
 	"github.com/ihleven/cloud11-api/drive"
+	"github.com/pkg/errors"
 )
 
 type hiHandle struct {
@@ -26,8 +32,9 @@ type hiHandle struct {
 	MTime    int64  `json:"mtime"`
 	HasDirs  bool   `json:"has_dirs"`
 	//Members  []Member `json:"members"`
-	ID    string `json:"id"`
-	Image Image  `json:"image"`
+	ID      string       `json:"id"`
+	Image   *drive.Image `json:"image"`
+	content []byte
 }
 
 func (h *hiHandle) Mode() os.FileMode {
@@ -48,15 +55,99 @@ func (h *hiHandle) OpenFile(flag int, perm os.FileMode) (*os.File, error) {
 func (h *hiHandle) ReadDir(mode os.FileMode) ([]drive.Handle, error) {
 	return nil, nil
 }
+func (h *hiHandle) ReadImage() (*drive.Image, error) {
+
+	i := drive.Image{
+		//ColorModel: config.ColorModel,
+		Width:  h.Image.Width,
+		Height: h.Image.Height,
+		Ratio:  float64(h.Image.Height) / float64(h.Image.Width) * 100,
+		//Format:     format,
+		//Src:        handle.ServeURL(),
+		//Name:   handle.Name(),
+		//Source: prefix,
+		Exif: h.Image.Exif,
+		// 	metaFile *File
+		// 	Title         string
+		// Caption       string // a “caption” is more like a title, while the “cutline” first describes what is happening in the picture, and then explains the significance of the event depicted.
+		// Cutline       string
+	}
+	if err := parseMeta(h.Path, &i); err != nil {
+		fmt.Println("ReadImage", h.Path, err)
+		return nil, errors.Wrap(err, "Error parsing meta")
+	}
+	return &i, nil
+}
+
+func metaFilename(path string) string {
+	base := strings.TrimSuffix(path, filepath.Ext(path))
+	return fmt.Sprintf("%s.txt", base)
+}
+
+func parseMeta(path string, i *drive.Image) error {
+
+	// 200 OK, 206 Partial content
+	queryParams := url.Values{
+		"path": {metaFilename(path)},
+	}
+
+	request, _ := http.NewRequest("GET", "https://api.hidrive.strato.com/2.1/file", nil)
+	request.URL.RawQuery = queryParams.Encode()
+	request.Header.Set("Authorization", "Bearer "+HIDrive.Token.GetAccessToken())
+
+	client := &http.Client{}
+	res, err := client.Do(request)
+	if err != nil {
+		return &hidriveError{res.StatusCode, res.Status}
+	}
+	if res.StatusCode >= 300 {
+		if res.StatusCode == 404 {
+			return nil
+		}
+		return NewHiDriveError(res.Body, res.StatusCode, res.Status)
+	}
+
+	re := regexp.MustCompile(`(?s)(?P<Title>.*?)=+(?P<Caption>.*?)---+(?P<Cutline>.*?)---+`)
+
+	content, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	match := re.FindSubmatch(content)
+	paramsMap := make(map[string]string)
+
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			paramsMap[name] = strings.TrimSpace(string(match[i]))
+		}
+	}
+	if title, ok := paramsMap["Title"]; ok {
+		i.Title = title
+	}
+	if caption, ok := paramsMap["Caption"]; ok {
+		i.Caption = caption
+	}
+	if cutline, ok := paramsMap["Cutline"]; ok {
+		i.Cutline = cutline
+	}
+	return nil
+}
 
 func (h *hiHandle) HasReadPermission(*auth.Account) bool {
 	return true
 }
 func (h hiHandle) Read(b []byte) (n int, err error) {
-	return 0, nil
+
+	body, err := hidriveGetFileContent(h.Path, HIDrive.Token.GetAccessToken())
+	copy(b, body)
+	return len(body), err
 }
-func (h hiHandle) Write(b []byte) (int, error) {
-	return 0, nil
+
+func (h *hiHandle) Write(b []byte) (int, error) {
+
+	_, e := hidrivePutFile(h.Path, b)
+	return len(b), e
 }
 
 func (h hiHandle) ReadSeeker() (io.ReadSeeker, error) {

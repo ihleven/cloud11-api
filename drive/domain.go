@@ -1,6 +1,7 @@
 package drive
 
 import (
+	"image/color"
 	"io"
 	"os"
 	"time"
@@ -11,25 +12,34 @@ import (
 // WebDrive is the domain and can modify state, interacting with storage and/or manipulating data as needed.
 // It contains the business logic.
 
+type PathType int
+
+const (
+	DrivePath PathType = iota
+	URLPath
+	AbsPath
+)
+
 type Driver interface {
 	Open(string) (Handle, error)
 	OpenFile(string, *auth.Account) (*File, error)
-	Create(string) (Handle, error)
+	Create(string, PathType) (Handle, error)
 	Mkdir(string) (Handle, error)
 	ListFiles(*File, *auth.Account) ([]File, error)
 	// CreateFile(folder *File, name string) (Handle, error)
-	// Mkdir(string) (Handle, error)
+	GetHandle(string, PathType) (Handle, error)
 }
 
 type Handle interface {
 	//Name() string       // base name of the file
 	//Size() int64        // length in bytes for regular files; system-dependent for others
 	//Mode() os.FileMode  // file mode bits
-	//ModTime() time.Time // modification time
-	IsDir() bool // abbreviation for Mode().IsDir()
+	ModTime() time.Time // modification time
+	IsDir() bool        // abbreviation for Mode().IsDir()
 	//Sys() interface{}   // underlying data source (can return nil)
 	OpenFile(flag int, perm os.FileMode) (*os.File, error)
 	ReadDir(mode os.FileMode) ([]Handle, error)
+	ReadImage() (*Image, error)
 	io.Reader
 	io.Writer
 	//io.Seeker
@@ -110,6 +120,61 @@ type DriveAction struct {
 	*File
 	Content string `json:"content,omitempty"`
 	Entries []File `json:"entries,omitempty"`
-	Image   string `json:"image,omitempty"`
+	Image   *Image `json:"image,omitempty"`
 	path    string
+}
+
+type Image struct {
+	ColorModel    color.Model
+	Width, Height int
+	Ratio         float64
+	Format        string
+	Title         string
+	Caption       string // a “caption” is more like a title, while the “cutline” first describes what is happening in the picture, and then explains the significance of the event depicted.
+	Cutline       string // the “cutline” is text below a picture, explaining what the reader is looking at
+
+	// https://web.ku.edu/~edit/captions.html
+	// https://jerz.setonhill.edu/blog/2014/10/09/writing-a-cutline-three-examples/
+
+	// Caption als allgemeingültige "standalone" Bildunterschrift und Cutline als Verbindung zum Album (ausgewählte Bilder in Reihe?)
+	Exif         *Exif
+	MetaFilePath string
+}
+
+// type ExifAlt struct {
+// 	Orientation *int
+// 	Taken       *time.Time
+// 	Lat,
+// 	Lng *float64
+// 	Model string
+// }
+
+type Exif struct {
+	//DateTimeOriginal, Make, Model,
+	// ImageWidth, ImageHeight, ExifImageWidth, ExifImageHeight,
+	// Aperture, ExposureTime, ISO, FocalLength, Orientation,
+	// XResolution, YResolution, ResolutionUnit, BitsPerSample,
+	// GPSLatitude, GPSLongitude, GPSAltitude
+	DateTimeOriginal string `json:"DateTimeOriginal"`
+	Make             string `json:"Make"`
+	Model            string `json:"Model"`
+	ImageWidth       int    `json:"ImageWidth"`
+	ImageHeight      int    `json:"ImageHeight"`
+	ExifImageWidth   int    `json:"ExifImageWidth"`
+	ExifImageHeight  int    `json:"ExifImageHeight"`
+
+	XResolution    float64 `json:"XResolution"`
+	YResolution    float64 `json:"YResolution"`
+	ResolutionUnit int     `json:"ResolutionUnit"`
+	BitsPerSample  int     `json:"BitsPerSample"`
+
+	Aperture     float64 `json:"Aperture"`
+	ExposureTime float64 `json:"ExposureTime"`
+	ISO          int     `json:"ISO"`
+	FocalLength  float64 `json:"FocalLength"`
+	Orientation  float64 `json:"Orientation"`
+
+	GPSLatitude  float64 `json:"GPSLatitude"`
+	GPSLongitude float64 `json:"GPSLongitude"`
+	GPSAltitude  float64 `json:"GPSAltitude"`
 }

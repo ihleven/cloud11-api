@@ -11,6 +11,8 @@ import (
 
 func (f *DriveAction) FileAction(r *http.Request) error {
 
+	fmt.Printf(" - FileAction => %s: %v\n", r.Method, f.path)
+
 	switch r.Method {
 	case http.MethodPut:
 		return f.FileJsonUpdateAction(r)
@@ -20,6 +22,7 @@ func (f *DriveAction) FileAction(r *http.Request) error {
 	}
 	bytes, err := f.File.GetContent()
 	f.Content = string(bytes)
+	fmt.Println(f.Content)
 	return err
 }
 
@@ -45,6 +48,8 @@ func (f DriveAction) FileJsonUpdateAction(r *http.Request) error {
 }
 
 func (f *File) GetContent() ([]byte, error) { //offset, limit int) (e error) {
+
+	fmt.Printf(" - GetContent\n")
 
 	var content = make([]byte, f.Size)
 

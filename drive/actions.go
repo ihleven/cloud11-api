@@ -73,7 +73,7 @@ func (a DriveAction) FolderUploadMultipleFiles(folder *File, formdata *multipart
 			return errors.Wrapf(err, "Could not open form file %v", header)
 		}
 
-		h, err := a.Drive.Create(folder.URL + "/" + header.Filename)
+		h, err := a.Drive.Create(folder.URL+"/"+header.Filename, URLPath)
 		if err != nil {
 			return errors.Wrapf(err, "Could not upload to folder '%v'. Unable to create the file for writing. Check your write access privilege", header.Filename)
 		}

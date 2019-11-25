@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.9 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	golang.org/x/sys v0.0.0-20191005200804-aed5e4c7ecf9 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 )

@@ -54,7 +54,7 @@ func DispatchRaw(wd hiDrive) http.HandlerFunc {
 		cleanedPath := path.Clean(path.Join("/users/ihleven", strings.Replace(r.URL.Path, "|", ".", 1)))
 		fmt.Println(cleanedPath)
 
-		err := hidriveGetFile(cleanedPath, wd.Token.GetAccessToken(), w)
+		err := hidriveStreamFile(cleanedPath, wd.Token.GetAccessToken(), w)
 		fmt.Println("ERROR:", err)
 		if checkHTTPError(w, err) {
 			return

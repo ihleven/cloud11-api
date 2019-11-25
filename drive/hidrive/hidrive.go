@@ -8,20 +8,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
+
+	"github.com/pkg/errors"
 )
 
-// https://my.hidrive.com/client/authorize?client_id=b4436f1157043c2bf8db540c9375d4ed&response_type=code&scope=admin,rw
-
-// => o67hRuKoho4KSunvhSmj
-
-// {
-// 	"refresh_token":"rt-cmgrqgjgodc1xomgfsdc",
-// 	"expires_in":3600,
-// 	"userid":"59995203.2308.9433",
-// 	"access_token":"z9N59zQpyWt4JI0h4fRs",
-// 	"alias":"ihleven",
-// 	"token_type":"Bearer"
-// }
+type StratoHiDrive struct {
+	token string
+}
 
 func getAccessToken(code string) (string, error) {
 
@@ -82,34 +77,6 @@ type DirResponse struct {
 	HasDirs  bool       `json:"has_dirs"`
 	NMembers int        `json:"nmembers"`
 	Members  []hiHandle `json:"members"`
-}
-
-type Image struct {
-	Width  int  `json:"width"`
-	Height int  `json:"height"`
-	Exif   Exif `json:"exif"`
-}
-
-type Exif struct {
-	DateTimeOriginal string  `json:"DateTimeOriginal"`
-	Make             string  `json:"Make"`
-	Model            string  `json:"Model"`
-	ImageWidth       int     `json:"ImageWidth"`
-	ImageHeight      int     `json:"ImageHeight"`
-	ExifImageWidth   int     `json:"ExifImageWidth"`
-	ExifImageHeight  int     `json:"ExifImageHeight"`
-	XResolution      float64 `json:"XResolution"`
-	YResolution      float64 `json:"YResolution"`
-	ResolutionUnit   int     `json:"ResolutionUnit"`
-	BitsPerSample    int     `json:"BitsPerSample"`
-	Aperture         float64 `json:"Aperture"`
-	ExposureTime     float64 `json:"ExposureTime"`
-	ISO              int     `json:"ISO"`
-	FocalLength      float64 `json:"FocalLength"`
-	Orientation      float64 `json:"Orientation"`
-	GPSLatitude      float64 `json:"GPSLatitude"`
-	GPSLongitude     float64 `json:"GPSLongitude"`
-	GPSAltitude      float64 `json:"GPSAltitude"`
 }
 
 func hidriveGetDir(path string, bearer string) (*DirResponse, error) {
@@ -185,7 +152,16 @@ func NewHiDriveError(txt io.ReadCloser, code int, status string) error {
 	fmt.Println("body:", body, code, status)
 	return &hidriveError
 }
-func hidriveGetFile(path string, bearer string, w http.ResponseWriter) error {
+func NewHiDriveError2(code int, status string, content []byte) error {
+	var hidriveError hidriveError
+	if err := json.Unmarshal(content, &hidriveError); err != nil {
+		hidriveError.Code = code
+		hidriveError.Message = status
+	}
+	return &hidriveError
+}
+
+func hidriveStreamFile(path string, bearer string, w io.Writer) error {
 	// 200 OK, 206 Partial content
 	queryParams := url.Values{
 		"path": {path},
@@ -208,6 +184,108 @@ func hidriveGetFile(path string, bearer string, w http.ResponseWriter) error {
 		fmt.Println("copy:", err)
 		return err
 	}
-	fmt.Println("file created")
+	fmt.Println("file getted")
 	return nil
+}
+func hidriveGetFileContent(path string, bearer string) ([]byte, error) {
+
+	// 200 OK, 206 Partial content
+	queryParams := url.Values{
+		"path": {path},
+	}
+
+	request, _ := http.NewRequest("GET", "https://api.hidrive.strato.com/2.1/file", nil)
+	request.URL.RawQuery = queryParams.Encode()
+	request.Header.Set("Authorization", "Bearer "+bearer)
+
+	client := http.DefaultClient
+	resp, err := client.Do(request)
+	if err != nil {
+		return nil, &hidriveError{resp.StatusCode, resp.Status}
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return body, NewHiDriveError2(resp.StatusCode, resp.Status, body)
+	}
+	return body, nil
+
+}
+
+func hidrivePutFile(p string, content []byte) (*hiHandle, error) {
+
+	dir, name := path.Split(p)
+	queryParams := url.Values{
+		"dir":  {strings.TrimSuffix(dir, "/")},
+		"name": {name},
+	}
+
+	request, _ := http.NewRequest("PUT", "https://api.hidrive.strato.com/2.1/file", bytes.NewReader(content))
+	request.URL.RawQuery = queryParams.Encode()
+	request.Header.Set("Authorization", "Bearer "+HIDrive.Token.GetAccessToken())
+	request.Header.Set("Content-Type", "text/plain")
+
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		return nil, &hidriveError{resp.StatusCode, resp.Status}
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode >= 300 {
+		return nil, NewHiDriveError2(resp.StatusCode, resp.Status, body)
+	}
+
+	var handle hiHandle
+	if err = json.Unmarshal(body, &handle); err != nil {
+		return nil, errors.Wrap(err, "Could not unmarshall put response")
+	}
+	return &handle, nil
+}
+
+func hidrivePostFile(p string, bearer string) (*hiHandle, error) {
+
+	dirname, filename := path.Split(p)
+	dirname = strings.TrimSuffix(dirname, "/")
+	queryParams := url.Values{
+		"dir":  {dirname},
+		"name": {filename},
+		//"on_exist": {"overwrite"},
+	}
+
+	request, _ := http.NewRequest("POST", "https://api.hidrive.strato.com/2.1/file", strings.NewReader(""))
+	request.URL.RawQuery = queryParams.Encode()
+	request.Header.Set("Authorization", "Bearer "+bearer)
+	request.Header.Set("Content-Type", "text/plain")
+
+	client := &http.Client{}
+	res, err := client.Do(request)
+	if err != nil {
+		return nil, &hidriveError{res.StatusCode, res.Status}
+	}
+
+	if res.StatusCode >= 300 {
+		return nil, NewHiDriveError(res.Body, res.StatusCode, res.Status)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	// fmt.Println(" * hidrivePostFileResponse:", string(body), res.Status, res.StatusCode, "adf")
+
+	var handle hiHandle
+	if err = json.NewDecoder(bytes.NewReader(body)).Decode(&handle); err != nil {
+		return nil, err
+	}
+	fmt.Printf(" * hidrivePostFileResponse: %v\n", handle)
+
+	return &handle, nil
+
 }

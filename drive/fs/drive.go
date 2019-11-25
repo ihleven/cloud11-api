@@ -20,9 +20,9 @@ type FSWebDrive struct {
 	// Absolute path inside filesystem
 	Root string `json:"-"` // /home/ihle/tmp
 	// pathname of root dir in webview
-	Prefix string `json:"prefix"` // /home
+	Prefix string `json:"url"` // /home
 	// pathname of root dir in serveview
-	ServeURL string `json:"rawPrefix"` // /serve/home
+	ServeURL string `json:"serveUrl"` // /serve/home
 	// indicates if index.html is served for directories in serveview
 	serveIndexHtml bool `json:"-"`
 	// AlbumURL       string          `json:"albumUrl"`
@@ -83,16 +83,36 @@ func (wd *FSWebDrive) GetServeHandle(path string) (os.FileInfo, *os.File, error)
 }
 
 func (wd *FSWebDrive) Open(name string) (drive.Handle, error) {
-	return wd.GetHandle(name)
+	// path := strings.TrimPrefix(filepath.Clean(url), prefix)
+	// location := filepath.Join(wd.Root, path)
+	location := path.Join(wd.Root, name)
+
+	info, err := os.Stat(location)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.Wrapf(err, "os.Stat failed for %s (location: %s)", name, location)
+		}
+		return nil, errors.Wrapf(err, "os.Stat failed for %s (location: %s)", name, location)
+	}
+
+	fh := handle{FileInfo: info, location: location, mode: info.Mode()}
+
+	if wd.PermissionMode != 0 {
+		// replace 9 least significant bits from mode with storage.PermissionMode
+		fh.mode = (fh.mode & 0xfffffe00) | (wd.PermissionMode & os.ModePerm) // & 0x1ff
+	}
+	return &fh, nil
 }
 func (wd *FSWebDrive) OpenFile(name string, account *auth.Account) (*drive.File, error) {
 	return wd.GetFile(name, account)
 }
-func (wd *FSWebDrive) GetHandle(name string) (drive.Handle, error) {
-
+func (wd *FSWebDrive) GetHandle(name string, t drive.PathType) (drive.Handle, error) {
 	// path := strings.TrimPrefix(filepath.Clean(url), prefix)
 	// location := filepath.Join(wd.Root, path)
 	location := path.Join(wd.Root, name)
+	if t == drive.AbsPath {
+		location = name
+	}
 
 	info, err := os.Stat(location)
 	if err != nil {
@@ -189,30 +209,46 @@ func (wd *FSWebDrive) CreateFile(folder *drive.File, name string) (drive.Handle,
 	handle := NewHandle(info, path.Join(h.location, info.Name()), 0)
 	return handle, nil
 }
-func (wd *FSWebDrive) Create(url string) (drive.Handle, error) {
 
-	// create gets an url includen Drive prefix
-	location := strings.Replace(url, wd.Prefix, wd.Root, 1)
-	fmt.Println("Crete: ", location, url)
+func (wd *FSWebDrive) location(p string, pathtype drive.PathType) string {
+	location := p
+	switch pathtype {
+	case drive.URLPath:
+		location = strings.Replace(p, wd.Prefix, wd.Root, 1)
+	case drive.AbsPath:
+	default:
+		location = path.Join(wd.Root, p)
+	}
+	return location
+}
+
+// Create creates an empty file
+func (wd *FSWebDrive) Create(url string, pathtype drive.PathType) (drive.Handle, error) {
+
+	location := wd.location(url, pathtype)
+	fmt.Println("Create: ", location)
 	var _, err = os.Stat(location)
+
 	var file *os.File
-	// create file if not exists
+	dir, base := path.Split(location)
+
 	if os.IsNotExist(err) {
 		file, err = os.Create(location)
-
-		//defer file.Close()
+		defer file.Close()
 	} else {
-		dir, base := filepath.Split(location)
 		basename := strings.TrimSuffix(base, filepath.Ext(base)) + ".*" + filepath.Ext(base)
 		file, err = ioutil.TempFile(dir, basename)
 	}
-	// file, err := os.OpenFile(h.location+"/"+name, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Could not create file %v", url)
 	}
+
 	info, err := file.Stat()
-	handle := NewHandle(info, path.Join(location, info.Name()), 0)
-	return handle, nil
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not stat/create file %v", url)
+	}
+
+	return NewHandle(info, path.Join(dir, info.Name()), 0), nil
 }
 
 func (wd *FSWebDrive) Mkdir(url string) (drive.Handle, error) {
@@ -223,7 +259,7 @@ func (wd *FSWebDrive) Mkdir(url string) (drive.Handle, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "Could not create folder %v", url)
 	}
-	handle, err := wd.GetHandle(path.Join(wd.Root, url))
+	handle, err := wd.GetHandle(path.Join(wd.Root, url), drive.AbsPath)
 
 	return handle, nil
 }

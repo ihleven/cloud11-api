@@ -22,11 +22,14 @@ type hiDrive struct {
 	Root     string `json:"-"`        // /users/ihleven
 	URL      string `json:"url"`      // /hidrive
 	ServeURL string `json:"serveUrl"` // /hiserve
-	Token    Token  `json:"-"`
+	Token    *Token `json:"-"`
 }
 
 var HIDrive hiDrive = hiDrive{Root: "/users/ihleven", URL: "/hidrive", ServeURL: "/hiserve"}
 
+func (hd *hiDrive) GetHandle(name string, t drive.PathType) (drive.Handle, error) {
+	return nil, nil
+}
 func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 
 	queryParams := url.Values{
@@ -43,6 +46,7 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if res.StatusCode != 200 {
 		return nil, NewHiDriveError(res.Body, res.StatusCode, res.Status)
 	}
@@ -50,19 +54,17 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("hidriveGetMetaResponse:", string(body), res.Status, res.StatusCode, "adf")
 
 	var handle hiHandle
 	if err = json.NewDecoder(bytes.NewReader(body)).Decode(&handle); err != nil {
 		return nil, err
 	}
-	fmt.Printf("hidriveGetMetaResponse prsed: %v\n", handle)
 
 	return &handle, nil
 }
 
 func (hd *hiDrive) Open(name string) (drive.Handle, error) {
-	return nil, nil
+	return hd.GetMeta(name)
 }
 
 func (hd *hiDrive) OpenFile(name string, account *auth.Account) (*drive.File, error) {
@@ -73,10 +75,10 @@ func (hd *hiDrive) OpenFile(name string, account *auth.Account) (*drive.File, er
 	}
 
 	var file = drive.File{
-		// Handle: h,
-		URL:  path.Join(hd.URL, h.Path),
-		Name: h.Name,
-		Size: int64(h.Size),
+		Handle: h,
+		URL:    path.Join(hd.URL, h.Path),
+		Name:   h.Name,
+		Size:   int64(h.Size),
 		// // Mode:          h.mode,
 		Type: h.GuessMIME(),
 		// // Permissions:   h.mode.String(),
@@ -88,8 +90,19 @@ func (hd *hiDrive) OpenFile(name string, account *auth.Account) (*drive.File, er
 
 	return &file, nil
 }
-func (h *hiDrive) Create(string) (drive.Handle, error) {
-	return nil, nil
+func (hd *hiDrive) Create(p string, pathtype drive.PathType) (drive.Handle, error) {
+	fmt.Println("CREATE", p)
+	m, err := hd.GetMeta(p)
+	if strings.HasPrefix(err.Error(), "Not Found") {
+		fmt.Println("Not Found")
+		m, err = hidrivePostFile(p, hd.Token.GetAccessToken())
+	}
+	// var file *os.File
+	// dir, base := path.Split(p)
+
+	fmt.Println("CREATE", m, err)
+
+	return m, err
 }
 func (h *hiDrive) Mkdir(string) (drive.Handle, error) {
 	return nil, nil
@@ -97,6 +110,7 @@ func (h *hiDrive) Mkdir(string) (drive.Handle, error) {
 
 func (h *hiDrive) ListFiles(folder *drive.File, account *auth.Account) ([]drive.File, error) {
 
+	//folder.
 	dir, err := hidriveGetDir(strings.TrimPrefix(folder.URL, h.URL), h.Token.GetAccessToken())
 	if err != nil {
 		fmt.Println("errdir", err)

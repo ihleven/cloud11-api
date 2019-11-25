@@ -2,6 +2,7 @@ package fs
 
 import (
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,6 +12,10 @@ import (
 	"github.com/ihleven/cloud11-api/auth"
 	"github.com/ihleven/cloud11-api/drive"
 	"github.com/pkg/errors"
+
+	_ "image/color"
+	_ "image/jpeg"
+	_ "image/png"
 )
 
 // FSHandle erfüllt Mimer, Locator,
@@ -92,6 +97,7 @@ func (h handle) Seek(offset int64, whence int) (int64, error) {
 
 // Write implements io.Writer interface for handle
 func (h handle) Write(b []byte) (int, error) {
+	fmt.Println("fs.HAndle.Write", string(b))
 	fd, err := h.OpenFile(os.O_WRONLY|os.O_TRUNC, 0)
 	if err != nil {
 		return 0, err
@@ -129,6 +135,40 @@ func (h handle) ReadDir(mode os.FileMode) ([]drive.Handle, error) {
 		entries[index] = NewHandle(info, filepath.Join(h.location, info.Name()), mode)
 	}
 	return entries, nil
+}
+func (h handle) ReadImage() (*drive.Image, error) {
+
+	fd, err := os.Open(h.location)
+	defer fd.Close()
+	if err != nil {
+		return nil, errors.Wrapf(err, "ReadImage: Could not get file descriptor for %v", h.location)
+	}
+
+	config, format, err := image.DecodeConfig(fd)
+	if err != nil {
+		return nil, errors.Wrapf(err, "ReadImage: Could not decode image %v", h.location)
+	}
+
+	i := drive.Image{
+		ColorModel: config.ColorModel,
+		Width:      config.Width,
+		Height:     config.Height,
+		Ratio:      float64(config.Height) / float64(config.Width) * 100,
+		Format:     format,
+		//Src:        handle.StoragePath(),
+		//Name:       handle.Name(),
+		MetaFilePath: metaFilename(h.location),
+	}
+	fmt.Println("REadimage:", h.location, i)
+	if err = parseMeta(h.location, &i); err != nil {
+		errors.Wrap(err, "Error parsing meta")
+	}
+
+	if err = exifDecode(&i, fd); err != nil {
+		fmt.Println("Error Decoding Exif with Goexif =>", err)
+	}
+
+	return &i, nil
 }
 
 func (h handle) userAndGroupIDs() (uid uint32, gid uint32) {

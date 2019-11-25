@@ -24,7 +24,7 @@ func NewServer(address string) *http.Server {
 	if err != nil {
 		fmt.Println("token error:", err)
 	}
-	hidrive.HIDrive.Token = *token
+	hidrive.HIDrive.Token = token
 
 	var router = Router{
 		arbeit:  arbeithandler.ArbeitHandler{},
@@ -113,6 +113,7 @@ func (r Router) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func checkHTTPError(w http.ResponseWriter, err error) bool {
+	fmt.Println("checkHTTPError", err)
 	if err != nil {
 		status := http.StatusInternalServerError
 		cause := errors.Cause(err)
