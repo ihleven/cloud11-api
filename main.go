@@ -1,21 +1,31 @@
 package main
 
 import (
-	"log"
-
 	"github.com/ihleven/cloud11-api/arbeit"
+	arbeithandler "github.com/ihleven/cloud11-api/arbeit/handler"
 	"github.com/ihleven/cloud11-api/arbeit/repository"
-	"github.com/ihleven/cloud11-api/http"
+	"github.com/ihleven/cloud11-api/webserver"
 )
 
 func main() {
 
 	repo, _ := repository.NewPostgresRepository()
-	arbeit.Repo = *repo
-	defer arbeit.Repo.Close()
+	uc := arbeit.NewUsecase(repo)
+	uc.SetupArbeitsjahr(2020, 1)
+	// for _, k := range kalender.ListKalendertage(2020) {
+	// 	err := repo.UpsertKalendertag(k)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// }
+
+	// arbeit.Repo = *repo
 	//tag, _ := repo.RetrieveArbeitstag(2019, 6, 23, 1)
+	//	defer arbeit.Repo.Close()
 	//fmt.Println(" => ", tag)
 
-	srv := http.NewServer(":8000")
-	log.Fatal(srv.ListenAndServe())
+	srv := webserver.New("", 8000)
+	srv.Register("/arbeit", arbeithandler.ArbeitHandler(uc))
+
+	srv.ListenAndServe()
 }

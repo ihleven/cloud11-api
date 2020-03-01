@@ -5,34 +5,36 @@ type ArbeitstagStatus string
 
 // ArbeitstagStatus ...
 const (
-	StatusFrei             ArbeitstagStatus = "-"
-	StatusArbeitstag       ArbeitstagStatus = "A"
-	StatusArbeitsvormittag ArbeitstagStatus = "V"
-	StatusFeiertag         ArbeitstagStatus = "S"
-	StatusBetriebsfrei     ArbeitstagStatus = "F"
+	StatusFrei       ArbeitstagStatus = "-"
+	StatusArbeitstag ArbeitstagStatus = "A"
+	StatusFeiertag   ArbeitstagStatus = "F"
+	//	StatusBetriebsfrei     ArbeitstagStatus = "F"
 )
 
 // ArbeitstagKategorie ...
 type ArbeitstagKategorie string
 
-// Buero ...
+// Ohne, Krank
 const (
+	Ohne         ArbeitstagKategorie = "-"
+	Krank        ArbeitstagKategorie = "K"
+	Urlaubstag   ArbeitstagKategorie = "U"
+	Sonderurlaub ArbeitstagKategorie = "S"
+
 	Buero             ArbeitstagKategorie = "B"
 	Homeoffice        ArbeitstagKategorie = "H"
-	Krank             ArbeitstagKategorie = "K"
-	Urlaub            ArbeitstagKategorie = "U"
-	Sonderurlaub      ArbeitstagKategorie = "S"
+	Dienstreise       ArbeitstagKategorie = "D"
 	Freizeitausgleich ArbeitstagKategorie = "F"
 )
 
 // ZeitspanneKategorie ...
-type ZeitspanneKategorie string
+type ZeitspanneStatus string
 
 // ZeitspanneKategorie ...
 const (
-	StatusAZ              ZeitspanneKategorie = "A"
-	StatusPause           ZeitspanneKategorie = "P"
-	StatusExtra           ZeitspanneKategorie = "E"
-	StatusWeg             ZeitspanneKategorie = "W"
-	StatusRestpausenabzug ZeitspanneKategorie = "R"
+	StatusArbeitszeit     ZeitspanneStatus = "A"
+	StatusPause           ZeitspanneStatus = "P"
+	StatusExtra           ZeitspanneStatus = "E"
+	StatusWeg             ZeitspanneStatus = "W"
+	StatusRestpausenabzug ZeitspanneStatus = "R"
 )

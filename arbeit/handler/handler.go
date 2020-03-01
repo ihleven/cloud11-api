@@ -8,46 +8,72 @@ import (
 	"strconv"
 
 	"github.com/ihleven/cloud11-api/arbeit"
+	"github.com/ihleven/cloud11-api/pkg/errors"
 )
 
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "PUT, DELETE, GET, HEAD")
+	(*w).Header().Set("Access-Control-Allow-Methods", "*")
 	(*w).Header().Set("Access-Control-Allow-Headers", "*")
+}
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
+type Marshaler interface {
+	Render(bool) ([]byte, error)
 }
 
 // ArbeitHandler ...
-type ArbeitHandler struct {
-	//domain arbeit.Domain
-}
+func ArbeitHandler(usecase *arbeit.Usecase) http.HandlerFunc {
 
-func (a ArbeitHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		setupResponse(&w, r)
+		if (*r).Method == "OPTIONS" {
+			return
+		}
+		enableCors(&w)
+		//sessionUser, _ := session.GetSessionUser(r, w)
 
-	enableCors(&w)
-	//sessionUser, _ := session.GetSessionUser(r, w)
+		var m Marshaler
+		var err error
 
-	var err error
+		params := parseURL(r.URL.Path)
 
-	params := parseURL(r.URL.Path)
+		switch {
+		case params.day != 0:
+			// m, err = usecase.GetArbeitstag(params.year, params.month, params.day, 1)
+			m, err = ArbeitstagAction(w, r, params, usecase)
 
-	switch {
-	case params.day != 0:
-		ArbeitstagAction(w, r, params)
+		case params.week != 0:
+			//err = params.HandleArbeitWoche(w, r, params)
 
-	case params.week != 0:
-		//err = params.HandleArbeitWoche(w, r, params)
+		case params.month != 0:
+			m, err = usecase.GetArbeitsmonat(params.year, params.month, 1)
 
-	case params.month != 0:
-		handleArbeitsmonat(w, r, params)
+		case params.year != 0:
+			m, err = usecase.Arbeitsjahr(params.year, 1)
 
-	case params.year != 0:
-		handleJahr(w, r, params)
+		default:
+			m, err = usecase.ListArbeitsjahre(1)
+			// http.NotFound(w, r)
+		}
+		if err != nil {
+			code, msg := errors.GetCode(err)
+			fmt.Println(code, msg, err)
+			http.Error(w, msg, int(code))
+		} else {
 
-	default:
-		http.NotFound(w, r)
-	}
-	if err != nil {
-		http.Error(w, err.Error(), 500)
+			bytes, err := m.Render(true)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(bytes)
+
+		}
 	}
 }
 
@@ -78,49 +104,45 @@ func parseURL(urlpath string) *params {
 	return &params
 }
 
-func ArbeitstagAction(w http.ResponseWriter, r *http.Request, p *params) {
-
+func ArbeitstagAction(w http.ResponseWriter, r *http.Request, p *params, usecase *arbeit.Usecase) (Marshaler, error) {
 	switch r.Method {
 	case http.MethodPut:
 
 		var body arbeit.Arbeitstag
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
-
-			http.Error(w, err.Error(), 400)
-			return
+			return nil, errors.Code(errors.BadRequest, "Could not decode request body")
 		}
-
-		err = arbeit.UpdateArbeitstag(p.year, p.month, p.day, 1, &body)
+		arbeitstag, err := usecase.UpdateArbeitstag(p.year, p.month, p.day, 1, &body)
+		fmt.Println("--- ArbeitstagAction", p, r.Method, arbeitstag, err)
 		if err != nil {
-			http.Error(w, err.Error(), 500) //return errors.Wrapf(err, "could not update arbeitstag %v", body)
-			return
+			return nil, errors.WithMessage(err, "Could not update arbeitstag")
 		}
-
+		// return arbeitstag, nil
 		fallthrough
 
 	case http.MethodGet:
 
-		arbeitstag, err := arbeit.GetArbeitstag(p.year, p.month, p.day, 1)
+		arbeitstag, err := usecase.GetArbeitstag(p.year, p.month, p.day, 1)
 		if err != nil {
-			fmt.Println(err)
-			http.Error(w, err.Error(), 500)
-			return //errors.Wrapf(err, "could not read arbeitstag %d/%d/%d %d", p.year, p.month, p.day, 1)
+			return nil, errors.Wrap(err, "could not read arbeitstag %d/%d/%d %d", p.year, p.month, p.day, 1)
 		}
-		//json.NewEncoder(w).Encode(arbeitstag)
-		js, err := json.MarshalIndent(arbeitstag, "", "\t")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		return arbeitstag, nil
+		// js, err := json.MarshalIndent(arbeitstag, "", "\t")
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "could not marshal arbeitstag %d/%d/%d %d", p.year, p.month, p.day, 1)
+		// }
 
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		// w.Header().Set("Content-Type", "application/json")
+		// w.Write(js)
 
 	default:
-		//http.Error(w, "only get or put", 400)
-		enableCors(&w)
+		fmt.Println("--- def", p, r.Method)
+
+		return nil, errors.Code(errors.BadRequest, "Only get or put")
+		// enableCors(&w)
 	}
+	return nil, nil
 }
 
 // func handleArbeitswoche(w http.ResponseWriter, r *http.Request, p *params) {
@@ -130,21 +152,3 @@ func ArbeitstagAction(w http.ResponseWriter, r *http.Request, p *params) {
 // 	}
 // 	json.NewEncoder(w).Encode(arbeitswoche)
 // }
-
-func handleJahr(w http.ResponseWriter, r *http.Request, p *params) {
-
-	arbeitsjahr, err := arbeit.GetArbeitsjahr(p.year, 1)
-	if err != nil {
-		http.Error(w, "error with GetArbeitsJahr", 500)
-	}
-	json.NewEncoder(w).Encode(arbeitsjahr)
-}
-
-func handleArbeitsmonat(w http.ResponseWriter, r *http.Request, p *params) {
-	fmt.Println("handleArbeitmonat", p.year, p.month)
-	arbeitsmonat, err := arbeit.GetArbeitsmonat(p.year, p.month, 1)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-	}
-	json.NewEncoder(w).Encode(arbeitsmonat)
-}

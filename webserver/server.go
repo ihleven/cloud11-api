@@ -1,4 +1,4 @@
-package http
+package webserver
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	arbeithandler "github.com/ihleven/cloud11-api/arbeit/handler"
 	"github.com/ihleven/cloud11-api/drive"
 	"github.com/pkg/errors"
 
@@ -27,7 +26,7 @@ func NewServer(address string) *http.Server {
 	hidrive.HIDrive.Token = token
 
 	var router = Router{
-		arbeit:  arbeithandler.ArbeitHandler{},
+		// arbeit:  arbeithandler.ArbeitHandler{},
 		home:    drive.Dispatch(&fs.Drive),
 		serve:   drive.DispatchRaw(&fs.Drive),
 		hidrive: drive.DispatchHandler(&hidrive.HIDrive),
@@ -89,12 +88,14 @@ func (r Router) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	case "arbeit":
 		r.arbeit.ServeHTTP(res, req)
-
+		return
 	case "hidrive":
 		r.hidrive(res, req)
+		return
 		//_, err = hidrive.GetHandle(req.URL.Path)
 	case "hiserve":
 		r.hiserve(res, req)
+		return
 		//_, err = hidrive.GetHandle(req.URL.Path)
 
 	default:
