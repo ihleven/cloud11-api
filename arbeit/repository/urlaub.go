@@ -2,7 +2,7 @@ package repository
 
 import (
 	"github.com/ihleven/cloud11-api/arbeit"
-	"github.com/ihleven/cloud11-api/pkg/errors"
+	"github.com/ihleven/errors"
 )
 
 func (r *Repository) ListUrlaube(account, jahr, nr int) ([]arbeit.Urlaub, error) {

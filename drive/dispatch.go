@@ -14,6 +14,7 @@ import (
 )
 
 func checkHTTPError(w http.ResponseWriter, err error) bool {
+	fmt.Printf("checkerror")
 	if err != nil {
 		status := http.StatusInternalServerError
 		cause := errors.Cause(err)
@@ -90,7 +91,8 @@ func DispatchHandler(wd Driver) http.HandlerFunc {
 		}
 
 		file, err := wd.OpenFile(action.path, auth.CurrentUser)
-		if checkHTTPError(w, err) {
+		if err != nil {
+			HandleDriveError(err, w)
 			return
 		}
 
@@ -108,9 +110,12 @@ func DispatchHandler(wd Driver) http.HandlerFunc {
 
 			err = action.ImageAction(r)
 		}
-		if checkHTTPError(w, err) {
-			return
+		if err != nil {
+			HandleDriveError(err, w)
 		}
+		// if checkHTTPError(w, err) {
+		// 	return
+		// }
 		action.Breadcrumbs = generateParents(action.File.URL, "root")
 
 		js, err := json.MarshalIndent(action, "", "    ")
@@ -145,10 +150,11 @@ func Dispatch(wd Driver) func(*http.Request) (*DriveAction, error) {
 			action.Entries, err = wd.ListFiles(action.File, auth.CurrentUser)
 		}
 		if action.File.Type.Mediatype == "text" {
-			// err = driveAction.TextFileAction(r, file)
-			var bytecontent []byte
-			bytecontent, err = action.File.GetContent()
-			action.Content = string(bytecontent)
+			err = action.FileAction(r)
+
+			// var bytecontent []byte
+			// bytecontent, err = action.File.GetContent()
+			// action.Content = string(bytecontent)
 		}
 		if action.File.Type.Mediatype == "image" {
 			fmt.Println("image handler", r.Method)

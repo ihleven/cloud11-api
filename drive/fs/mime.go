@@ -73,3 +73,24 @@ func (fh handle) GuessMIME() drive.Type {
 	// }
 	return file
 }
+func GetMIMEByExtension(filename string) *drive.Type {
+	ext := path.Ext(filename)
+	if mimestr := mime.TypeByExtension(ext); mimestr != "" {
+
+		mime := types.NewMIME(mimestr)
+		splitmimestr := strings.Split(mime.Subtype, "; charset=")
+		var charset string
+		if len(splitmimestr) > 1 {
+			charset = splitmimestr[1]
+		}
+		//fmt.Println(mime, splitmimestr[0])
+		return &drive.Type{
+			Filetype:  "F",
+			Mediatype: mime.Type,
+			Subtype:   splitmimestr[0],
+			MIME:      mime.Type + "/" + splitmimestr[0],
+			Charset:   charset,
+		}
+	}
+	return nil
+}

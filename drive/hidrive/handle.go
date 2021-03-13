@@ -16,6 +16,7 @@ import (
 
 	"github.com/ihleven/cloud11-api/auth"
 	"github.com/ihleven/cloud11-api/drive"
+	"github.com/ihleven/cloud11-api/drive/fs"
 	"github.com/pkg/errors"
 )
 
@@ -173,7 +174,9 @@ func (h hiHandle) GuessMIME() drive.Type {
 	}
 	if h.Type == "file" {
 		t.Filetype = "F"
-
+		if h.MIMEType == "application/octet-stream" {
+			return *fs.GetMIMEByExtension(h.Name)
+		}
 		media, sub := path.Split(h.MIMEType)
 		t.Mediatype = strings.TrimSuffix(media, "/")
 		t.Subtype = sub

@@ -27,11 +27,11 @@ func setupFeiertage(jahr int) map[int]string {
 	return feiertageMap
 }
 
-func ListKalendertage(year int) []Kalendertag {
+func ListKalendertage(year int) []Tag {
 
 	feiertageMap := setupFeiertage(year)
 
-	kalendertage := []Kalendertag{}
+	kalendertage := []Tag{}
 	// feiertage := []feiertage.Feiertag{feiertage.Neujahr(year), feiertage.Valentinstag(year), feiertage.Epiphanias(year), feiertage.Weiberfastnacht(year)}
 	// feiertageMap := make(map[int]string)
 	// for _, feiertag := range feiertage {
@@ -48,7 +48,7 @@ func ListKalendertage(year int) []Kalendertag {
 			// Sonntag
 			weekday = 7
 		}
-		kalendertag := Kalendertag{
+		kalendertag := Tag{
 			ID:      id(d.Date()),
 			Datum:   d,
 			Jahr:    int16(d.Year()),

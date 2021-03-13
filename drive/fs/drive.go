@@ -14,7 +14,7 @@ import (
 	"github.com/ihleven/cloud11-api/drive"
 )
 
-var Drive FSWebDrive = FSWebDrive{Root: "/Users/mi/tmp", Prefix: "/home", ServeURL: "/serve/home", PermissionMode: 0}
+var Drive FSWebDrive = FSWebDrive{Root: "/Users/mi/data/tmp", Prefix: "/home", ServeURL: "/serve/home", PermissionMode: 0}
 
 type FSWebDrive struct {
 	// Absolute path inside filesystem

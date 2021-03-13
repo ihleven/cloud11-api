@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/ihleven/cloud11-api/arbeit"
-	"github.com/ihleven/cloud11-api/pkg/errors"
+	"github.com/ihleven/errors"
 	pq "github.com/lib/pq"
 )
 
-func (r *Repository) ListZeitspannen(account int, datum arbeit.Date) ([]arbeit.Zeitspanne, error) {
+func (r *Repository) ListZeitspannen(account int, date time.Time) ([]arbeit.Zeitspanne, error) {
 
 	query := `SELECT nr, status, start, ende, dauer
 		        FROM c11_zeitspanne
@@ -17,17 +17,18 @@ func (r *Repository) ListZeitspannen(account int, datum arbeit.Date) ([]arbeit.Z
 			ORDER BY nr`
 
 	zeitspannen := []arbeit.Zeitspanne{}
-	err := r.DB.Select(&zeitspannen, query, account, time.Time(datum))
-	fmt.Println("err=>", err)
+	err := r.DB.Select(&zeitspannen, query, account, date)
+
 	return zeitspannen, err
 }
 
-func (r *Repository) UpsertZeitspanne(account int, datum arbeit.Date, z *arbeit.Zeitspanne) error {
+func (r *Repository) UpsertZeitspanne(account int, datum time.Time, z *arbeit.Zeitspanne) error {
 
-	stmt := `INSERT INTO c11_zeitspanne 
-	                (account,datum,nr,status,start,ende,dauer)
-		     VALUES ($1,$2,$3,$4,$5,$6,$7)
-	`
+	stmt := `
+		INSERT INTO c11_zeitspanne 
+		        	(account,datum,nr,status,start,ende,dauer)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7)`
+
 	_, err := r.DB.Exec(stmt, account, time.Time(datum), z.Nr, z.Status, z.Start, z.Ende, z.Dauer)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code != "23505" { //"23505": "unique_violation",
@@ -48,7 +49,8 @@ func (r *Repository) UpsertZeitspanne(account int, datum arbeit.Date, z *arbeit.
 	}
 	return nil
 }
-func (r Repository) DeleteZeitspanne(account int, datum arbeit.Date, nr int) error {
+
+func (r Repository) DeleteZeitspanne(account int, datum time.Time, nr int) error {
 
 	stmt := `DELETE FROM c11_zeitspanne WHERE account=$1 AND datum=$2 AND nr=$3`
 	_, err := r.DB.Exec(stmt, account, datum, nr)

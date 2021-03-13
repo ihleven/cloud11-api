@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ihleven/cloud11-api/kalender"
-	"github.com/ihleven/cloud11-api/pkg/errors"
+	"github.com/ihleven/errors"
 )
 
 func NewUsecase(repo Repository) *Usecase {
@@ -25,10 +25,11 @@ func (uc *Usecase) ListArbeitsjahre(account int) (Arbeitsjahre, error) {
 	return arbeitsjahre, nil
 }
 
-func (uc *Usecase) Arbeitsjahr(year, account int) (*Arbeitsjahr, error) {
+func (uc *Usecase) Arbeitsjahr(account, year int) (*Arbeitsjahr, error) {
 
 	arbeitsjahre, err := uc.repo.RetrieveArbeitsjahre(account, year)
 	if err != nil {
+		fmt.Printf("err: %+v\n", err)
 		return nil, err
 	}
 	if len(arbeitsjahre) == 0 {
@@ -36,7 +37,7 @@ func (uc *Usecase) Arbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 	}
 	arbeitsjahr := arbeitsjahre[0]
 
-	arbeitsjahr.Monate, err = uc.repo.SelectArbeitsmonate(year, 0, account)
+	arbeitsjahr.Monate, err = uc.repo.SelectArbeitsmonate(account, year, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func (uc *Usecase) Arbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 
 func (uc *Usecase) SetupArbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 
-	err := uc.repo.SetupArbeitsjahr(account, "IC", year)
+	err := uc.repo.SetupArbeitsjahr(account, "IC", year, nil, nil)
 	if err != nil {
 		fmt.Println(err)
 		// return nil, err
@@ -62,13 +63,13 @@ func (uc *Usecase) SetupArbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 		}
 	}
 	for _, k := range kalender.ListKalendertage(year) {
-		fmt.Println("Tag:", k)
+
 		err := uc.repo.UpsertKalendertag(k)
 		if err != nil {
 			return nil, err
 		}
 		arbeitstag := Arbeitstag{
-			Account: 1, Job: "IC", Datum2: Date(k.Datum), Jahr: k.Jahr, Monat: k.Monat, Status: "A", Kategorie: "-", Soll: 8,
+			Account: 1, Datum: Date(k.Datum), Job: "IC", Status: "A", Kategorie: "-", Soll: 8,
 			Kommentar: "testkommentar",
 		}
 		if k.KwTag > 5 {
@@ -78,7 +79,7 @@ func (uc *Usecase) SetupArbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 		if k.Feiertag != "" {
 			arbeitstag.Status = "F"
 		}
-		err = uc.repo.UpsertArbeitstag(1, "IC", k.Datum, &arbeitstag)
+		err = uc.repo.SaveArbeitstag(1, k.Datum, "IC", arbeitstag)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -93,21 +94,21 @@ func (uc *Usecase) SetupArbeitsjahr(year, account int) (*Arbeitsjahr, error) {
 	}
 	arbeitsjahr := arbeitsjahre[0]
 
-	arbeitsjahr.Monate, err = uc.repo.SelectArbeitsmonate(year, 0, account)
+	arbeitsjahr.Monate, err = uc.repo.SelectArbeitsmonate(account, year, 0)
 	return &arbeitsjahr, nil
 }
 
-func (uc *Usecase) GetArbeitsmonat(year int, month int, accountID int) (*Arbeitsmonat, error) {
+func (uc *Usecase) GetArbeitsmonat(year int, month int, account int) (*Arbeitsmonat, error) {
 
-	am, err := uc.repo.SelectArbeitsmonate(year, month, 1)
+	am, err := uc.repo.SelectArbeitsmonate(account, year, month)
 
 	if len(am) == 0 {
 		return nil, nil
 	}
 	m := am[0]
-	m.Arbeitstage, err = uc.repo.ListArbeitstage(year, month, 0, accountID)
+
+	m.Tage, err = uc.repo.ListArbeitstage(account, year, month, 0)
 	if err != nil {
-		fmt.Println("err:", err)
 		return nil, err
 	}
 	//return &Arbeitsmonat{m}, nil
@@ -118,7 +119,8 @@ func (uc *Usecase) GetArbeitsmonat(year int, month int, accountID int) (*Arbeits
 /// ARBEITSTAG ///
 func (uc *Usecase) GetArbeitstag(year, month, day int, accountID int) (*Arbeitstag, error) {
 
-	at, err := uc.repo.ReadArbeitstag(accountID, year, month, day)
+	datum := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	at, err := uc.repo.ReadArbeitstag(accountID, datum)
 	if err != nil {
 		//return &Arbeitstag{}, nil
 		return nil, errors.Wrap(err, "Could not read Arbeitstag: %d/%d/%d, %d", year, month, day, accountID)
@@ -128,12 +130,11 @@ func (uc *Usecase) GetArbeitstag(year, month, day int, accountID int) (*Arbeitst
 
 func (uc *Usecase) UpdateArbeitstag(year, month, day int, accountID int, arbeitstag *Arbeitstag) (*Arbeitstag, error) {
 
-	fmt.Println("usecase update arbeitstag", year, month, day, accountID, arbeitstag.Zeitspannen)
-
-	id := ((year*100+month)*100+day)*1000 + accountID
+	// id := ((year*100+month)*100+day)*1000 + accountID
 	datum := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	fmt.Println("usecase update arbeitstag", year, month, day, accountID, arbeitstag, datum)
 
-	arbeitstag.Pausen, _ = uc.UpdateZeitspannen(accountID, Date(datum), arbeitstag.Zeitspannen)
+	arbeitstag.Pausen, _ = uc.UpdateZeitspannen(accountID, datum, arbeitstag.Zeitspannen)
 	arbeitstag.Extra = 0
 
 	// arbeitstagDB, err := Repo.ReadArbeitstag(id)
@@ -147,15 +148,15 @@ func (uc *Usecase) UpdateArbeitstag(year, month, day int, accountID int, arbeits
 		arbeitstag.Differenz = arbeitstag.Soll - arbeitstag.Netto
 	}
 
-	err := uc.repo.UpsertArbeitstag(1, "IC", datum, arbeitstag)
+	err := uc.repo.SaveArbeitstag(accountID, datum, "IC", *arbeitstag)
 	if err != nil {
-		return nil, errors.Wrap(err, "Could not update Arbeitstag %d", id)
+		return nil, errors.Wrap(err, "Could not update Arbeitstag %v", datum)
 	}
-	fmt.Println("sucess update arbeitstag", id)
+	fmt.Println("sucess update arbeitstag", datum)
 	return nil, nil
 }
 
-func (uc *Usecase) UpdateZeitspannen(account int, datum Date, zeitspannen []Zeitspanne) (float64, error) {
+func (uc *Usecase) UpdateZeitspannen(account int, datum time.Time, zeitspannen []Zeitspanne) (float64, error) {
 
 	pausen := 0.0
 

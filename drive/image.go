@@ -80,19 +80,16 @@ func (a *DriveAction) WriteImageMeta() error {
 	
 
 	metaHandle, err := a.Drive.Open(metaFilename(a.path))
-	
-	
 	if err != nil {
-		if strings.HasPrefix(err.Error(), "Not Found") {
-		metaHandle, err = a.Drive.Create(metaFilename(a.path), DrivePath)
+		if strings.HasPrefix(err.Error(), "Not Found") || os.IsNotExist(errors.Cause(err)) {
+			metaHandle, err = a.Drive.Create(metaFilename(a.path), DrivePath)
+		}
+		if err != nil {
+			return errors.Wrapf(err, "Could not open MetaFile %v", metaFilename(a.path))
 		}
 	}
-	if os.IsNotExist(errors.Cause(err))  {
-		metaHandle, err = a.Drive.Create(metaFilename(a.path), DrivePath)
-	}
-	if err != nil {
-		return errors.Wrapf(err, "Could not open MetaFile %v", metaFilename(a.path))
-	}
+	
+
 	//fd, err := os.OpenFile(a.Image.MetaFilePath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	// if i.metaFile == nil {
 	// 	filename := i.getMetaFilename()

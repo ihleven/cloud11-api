@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/ihleven/cloud11-api/kalender"
-	"github.com/ihleven/cloud11-api/pkg/errors"
+	"github.com/ihleven/errors"
 	pq "github.com/lib/pq"
 )
 
-func (r *Repository) UpsertKalendertag(k kalender.Kalendertag) error {
+func (r *Repository) UpsertKalendertag(k kalender.Tag) error {
 	// fmt.Println("UpsertKalendertag")
 
 	stmt := `

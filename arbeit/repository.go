@@ -8,24 +8,24 @@ import (
 
 type Repository interface {
 	// RetrieveArbeitsjahr(year int, accountID int) (*Arbeitsjahr, error)
-	RetrieveArbeitsmonat(year, month, accountID int) (*Arbeitsmonat, error)
-	ListArbeitstage(year, month, week int, accountID int) ([]Arbeitstag, error)
-	ReadArbeitstag(int, int, int, int) (*Arbeitstag, error)
+	// RetrieveArbeitsmonat(year, month, accountID int) (*Arbeitsmonat, error)
+	ListArbeitstage(accountID, year, month, week int) ([]Arbeitstag, error)
+	ReadArbeitstag(int, time.Time) (*Arbeitstag, error)
 	// UpdateArbeitstag(int, *Arbeitstag) error
 
-	ListZeitspannen(account int, datum Date) ([]Zeitspanne, error)
-	UpsertZeitspanne(account int, datum Date, z *Zeitspanne) error
-	DeleteZeitspanne(account int, datum Date, nr int) error
+	ListZeitspannen(account int, datum time.Time) ([]Zeitspanne, error)
+	UpsertZeitspanne(account int, datum time.Time, z *Zeitspanne) error
+	DeleteZeitspanne(account int, datum time.Time, nr int) error
 
 	Close()
 
-	SelectArbeitsmonate(year, month int, accountID int) ([]Arbeitsmonat, error)
+	SelectArbeitsmonate(int, int, int) ([]Arbeitsmonat, error)
 	RetrieveArbeitsjahre(account, jahr int) ([]Arbeitsjahr, error)
 
-	UpsertKalendertag(k kalender.Kalendertag) error
+	UpsertKalendertag(k kalender.Tag) error
 	// UpsertArbeitstag(a *Arbeitstag) error
-	UpsertArbeitstag(account int, job string, datum time.Time, a *Arbeitstag) error
-	SetupArbeitsjahr(account int, job string, year int) error
+	SaveArbeitstag(account int, datum time.Time, job string, a Arbeitstag) error
+	SetupArbeitsjahr(int, string, int, *time.Time, *time.Time) error
 	SetupArbeitsmonat(account int, job string, year, month int) error
 
 	ListUrlaube(account, jahr, nr int) ([]Urlaub, error)

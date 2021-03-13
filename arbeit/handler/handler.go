@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/ihleven/cloud11-api/arbeit"
-	"github.com/ihleven/cloud11-api/pkg/errors"
+	"github.com/ihleven/errors"
 )
 
 func enableCors(w *http.ResponseWriter) {
@@ -54,7 +54,7 @@ func ArbeitHandler(usecase *arbeit.Usecase) http.HandlerFunc {
 			m, err = usecase.GetArbeitsmonat(params.year, params.month, 1)
 
 		case params.year != 0:
-			m, err = usecase.Arbeitsjahr(params.year, 1)
+			m, err = usecase.Arbeitsjahr(1, params.year)
 
 		default:
 			m, err = usecase.ListArbeitsjahre(1)

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/ihleven/cloud11-api/kalender"
 )
 
 // Job beschreibt eine Entitaet, fuer die Arbeitszeit erfasst werden soll.
@@ -12,8 +14,8 @@ type Job struct {
 	Account     int       `json:"account"`
 	Nr          int       `json:"nr"`
 	Arbeitgeber string    `json:"arbeitgeber"`
-	Eintritt    time.Time `json:"von"`
-	Austritt    time.Time `json:"bis"`
+	Eintritt    time.Time `json:"eintritt"`
+	Austritt    time.Time `json:"austritt"`
 }
 
 type Urlaub struct {
@@ -35,15 +37,6 @@ type Urlaub struct {
 	Kommentar string    `json:"kommentar"`
 }
 
-type UrlaubStat struct {
-	Vorjahr    float64 `json:"vorjahr"`
-	Anspruch   float64 `json:"anspruch"`
-	Tage       float64 `json:"tage"`
-	Geplant    float64 `json:"geplant"`
-	Rest       float64 `json:"rest"`
-	Auszahlung float64 `json:"auszahlung"`
-}
-
 type Arbeitsjahre []Arbeitsjahr
 
 type Arbeitsjahr struct {
@@ -51,30 +44,65 @@ type Arbeitsjahr struct {
 	Job     string `json:"job,omitempty"`
 	Jahr    int    `json:"jahr"`
 
-	Urlaub UrlaubStat `json:"urlaub,omitempty"`
-	Soll   float64    `json:"soll"`
-	Ist    float64    `json:"ist"`
-	Diff   float64    `json:"diff"`
-	// TageArbeit            sql.NullFloat64
-	// TageKrank             sql.NullFloat64
-	// tageFreizeitausgleich sql.NullFloat64
-	// tageBuero             sql.NullFloat64
-	// tageDienstreise       sql.NullFloat64
-	// tageHomeoffice        sql.NullFloat64
-	// tageFrei              sql.NullFloat64
-	// jahrID                sql.NullInt64
-	// userID                sql.NullInt64
+	Von *time.Time `db:"von" json:"von,omitempty"`
+	Bis *time.Time `db:"bis" json:"bis,omitempty"`
+
+	Arbeitstage    int `db:"ARBTG" json:"-"`
+	Krankheitstage int `db:"K"     json:"-"`
+	Bürotage       int `db:"B"     json:"-"`
+	Homeoffice     int `db:"H"     json:"-"`
+	Dienstreise    int `db:"D"     json:"-"`
+	Zeitausgleich  int `db:"ZA"    json:"-"`
+
+	Soll          float64 `json:"soll"`
+	Ist           float64 `json:"ist"`
+	Diff          float64 `json:"diff"`
+	Saldo         float64 `json:"saldo"`
+	Zeiterfassung float64 `json:"zeiterfassung"`
+
+	Stat   ArbeitstageStat `json:"arbeitstage,omitempty"`
+	Urlaub UrlaubStat      `json:"urlaub,omitempty"`
+
 	Monate  []Arbeitsmonat `json:"monate,omitempty"`
 	Urlaube []Urlaub       `json:"urlaube,omitempty"`
 }
 
+type UrlaubStat struct {
+	Vorjahr      float64 `db:"uvorj" json:"vorjahr"`
+	Anspruch     float64 `db:"uansp" json:"anspruch"`
+	Tage         float64 `db:"utage" json:"tage"`
+	Sonderurlaub float64 `db:"usond" json:"sonderurlaub"`
+	Geplant      float64 `db:"ugepl" json:"geplant"`
+	Rest         float64 `db:"urest" json:"rest"`
+	Auszahlung   float64 `db:"uausz" json:"auszahlung"`
+}
+
+type ArbeitstageStat struct {
+	Arbeitstage   int `db:"ARBTG" json:"arbeitstage"`
+	Urlaub        int `db:"K"     json:"urlaubstage"`
+	Krank         int `db:"K"     json:"krankheitstage"`
+	Büro          int `db:"B"     json:"bürotage"`
+	Homeoffice    int `db:"H"     json:"tageHomeoffice"`
+	Dienstreise   int `db:"D"     json:"dienstreisetage"`
+	Zeitausgleich int `db:"ZA"    json:"ausgleichstage"`
+}
+
 type Arbeitsmonat struct {
-	Monat       int          `json:"monat,omitempty"`
-	Soll        float64      `json:"soll"`
-	Ist         float64      `json:"ist"`
-	Differenz   float64      `db:"diff" json:"diff"`
-	Saldo       float64      `json:"saldo"`
-	Arbeitstage []Arbeitstag `json:"tage,omitempty"`
+	// account integer NOT NULL,
+	// job     varchar(8) NOT NULL,
+	// jahr    integer NOT NULL,
+	Monat int `json:"monat,omitempty"`
+
+	Arbeitstage    int `db:"a" json:"arbeitstage"`
+	Krankheitstage int `db:"k" json:"krankheitstage"`
+	Urlaubstage    int `db:"u" json:"urlaubstage"`
+
+	Soll          float64      `          json:"soll"`
+	Ist           float64      `          json:"ist"`
+	Diff          float64      `db:"diff" json:"diff"`
+	Saldo         float64      `          json:"saldo"`
+	Zeiterfassung float64      `          json:"zeiterfasssung"`
+	Tage          []Arbeitstag `          json:"tage,omitempty"`
 }
 
 // type Arbeitswoche struct {
@@ -85,15 +113,13 @@ type Arbeitsmonat struct {
 // }
 
 type Arbeitstag struct {
-	Datum `json:"datum"`
-	// ID int `db:"id" json:"id"`
-
 	Account int    `json:"account"` //domain.Account
+	Datum   Date   `db:"datum" json:"datum"`
 	Job     string `json:"job"`
-	Datum2  Date   `db:"datum" json:"-"`
 
-	Jahr  int16 `json:"jahr,omitempty"`
-	Monat uint8 `json:"monat,omitempty"`
+	kalender.Tag `json:"tag"`
+	// Jahr  int16 `json:"jahr,omitempty"`
+	// Monat uint8 `json:"monat,omitempty"`
 
 	// Typ: A-Arbeitstag, A2-Halber Arbeitstag, U-Urluab, F-Feiertag,
 	Status ArbeitstagStatus `db:"status" json:"status,omitempty"`
@@ -118,21 +144,21 @@ type Arbeitstag struct {
 	Zeitspannen []Zeitspanne ` json:"zeitspannen,omitempty"`
 }
 
-type Datum struct {
-	Datum    Date    `json:"date,omitempty"`
-	Jahr     int16   `db:"jahr" json:"year,omitempty"`
-	Monat    uint8   `db:"monat" json:"month,omitempty"`
-	Tag      uint8   `db:"tag" json:"day,omitempty"`
-	Jahrtag  uint16  `db:"jahrtag" json:"jahrtag,omitempty"`
-	KwJahr   int16   `db:"kw_jahr" json:"kw_jahr,omitempty"`
-	KwNr     uint8   `db:"kw" json:"kw_nr,omitempty"`
-	KwTag    uint8   `db:"kw_tag" json:"kw_tag,omitempty"`
-	Feiertag *string `json:"feiertag,omitempty"`
+// type Datum struct {
+// 	Datum    Date    `json:"date,omitempty"`
+// 	Jahr     int16   `db:"jahr" json:"year,omitempty"`
+// 	Monat    uint8   `db:"monat" json:"month,omitempty"`
+// 	Tag      uint8   `db:"tag" json:"day,omitempty"`
+// 	Jahrtag  uint16  `db:"jahrtag" json:"jahrtag,omitempty"`
+// 	KwJahr   int16   `db:"kw_jahr" json:"kw_jahr,omitempty"`
+// 	KwNr     uint8   `db:"kw" json:"kw_nr,omitempty"`
+// 	KwTag    uint8   `db:"kw_tag" json:"kw_tag,omitempty"`
+// 	Feiertag *string `json:"feiertag,omitempty"`
 
-	// Ordinal int    `json:"ord,omitempty"`
-	//monatsname string
-	//tagesname  string
-}
+// 	// Ordinal int    `json:"ord,omitempty"`
+// 	//monatsname string
+// 	//tagesname  string
+// }
 
 // type Arbeitstag2 struct {
 // 	Datum  Datum

@@ -48,7 +48,7 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, NewHiDriveError(res.Body, res.StatusCode, res.Status)
+		return nil, drive.NewError(res.StatusCode, NewHiDriveError(res.Body, res.StatusCode, res.Status))
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -62,10 +62,11 @@ func (hd *hiDrive) GetMeta(path string) (*hiHandle, error) {
 		return nil, err
 	}
 	return &handle, nil
+	// return nil, drive.NewError(403, &hidriveError{Code: 401, Message: "no auth"})
 }
 
 func (hd *hiDrive) Open(name string) (drive.Handle, error) {
-
+	// flag: create if not exist
 	return hd.GetMeta(name)
 }
 
@@ -73,6 +74,7 @@ func (hd *hiDrive) OpenFile(name string, account *auth.Account) (*drive.File, er
 
 	h, err := hd.GetMeta(name)
 	if err != nil {
+		fmt.Println("error:", err)
 		return nil, errors.Wrapf(err, "Could not GetHandle(%v)", name)
 	}
 
